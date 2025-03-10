@@ -27,5 +27,5 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Flags().StringVar(&cfg.File, "file", "", "Specify access log file. default to prompt if not set")
+	rootCmd.Flags().StringVarP(&cfg.File, "file", "f", "", "Specify access log file. default to prompt if not set")
 }
