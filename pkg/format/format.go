@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 func New(config *Config) *App {
@@ -269,7 +270,12 @@ func (app *App) Entry() error {
 
 		// Iterate over the scanner, printing each line.
 		for scanner.Scan() {
-			printFormattedLog(scanner.Text())
+			line := scanner.Text()
+			if utf8.RuneCountInString(line) > 0 {
+				if line[0:1] == "[" {
+					printFormattedLog(line)
+				}
+			}
 		}
 	}
 	return nil
