@@ -3,6 +3,7 @@ package format
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -32,9 +33,14 @@ func findAllInstances(text string, letter string) []int {
 	return indices
 }
 
-func printFormattedLog(log string) {
+func printFormattedLog(log string) error {
 	// find all indices of the quote character
 	allInstanceOfQuote := findAllInstances(log, `"`)
+	// check for proper number of quotes.  Istio should have 14 and envoy should have 12
+	fmt.Println("len(allInstanceOfQuote) = ", len(allInstanceOfQuote))
+	if len(allInstanceOfQuote) != 14 && len(allInstanceOfQuote) != 12 {
+		return errors.New("invalid log message")
+	}
 	replacementStrings := []string{}
 	// iterate through the log message to pull out quoted strings, these are special entries
 	for i := 0; i < len(allInstanceOfQuote); i = i + 2 {
@@ -49,6 +55,7 @@ func printFormattedLog(log string) {
 
 	var logMessage LogMessage
 	logSplit := strings.Split(newLog, " ")
+	fmt.Println("len(logSplit) = ", len(logSplit))
 	if len(logSplit) == 22 {
 		for i := 0; i < len(logSplit); i++ {
 			switch i {
@@ -101,7 +108,7 @@ func printFormattedLog(log string) {
 				logMessage.ROUTE_NAME = logSplit[i]
 			}
 		}
-	} else {
+	} else if len(logSplit) == 13 {
 		// [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
 		// %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
 		// %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%"
@@ -139,6 +146,8 @@ func printFormattedLog(log string) {
 				logMessage.UPSTREAM_HOST = removeQuotes(replacementStrings[5])
 			}
 		}
+	} else {
+		return errors.New("invalid log message")
 	}
 
 	log_message, err := json.MarshalIndent(logMessage, "", "    ")
@@ -146,6 +155,7 @@ func printFormattedLog(log string) {
 		fmt.Println(err)
 	}
 	fmt.Println(string(log_message))
+	return nil
 }
 
 func (app *App) Entry() error {
@@ -155,7 +165,10 @@ func (app *App) Entry() error {
 		log, _ := reader.ReadString('\n')
 		//removes the newline character
 		log = strings.TrimSuffix(log, "\n")
-		printFormattedLog(log)
+		err := printFormattedLog(log)
+		if err != nil {
+			fmt.Println(err)
+		}
 	} else {
 		file, err := os.Open(app.config.File)
 		if err != nil {
@@ -173,7 +186,11 @@ func (app *App) Entry() error {
 			if utf8.RuneCountInString(line) > 0 {
 				// Envoy and Istio default access log will always start with [%START_TIME%]
 				if line[0:1] == "[" {
-					printFormattedLog(line)
+					err := printFormattedLog(line)
+					fmt.Println(err)
+					if err != nil {
+						fmt.Println(err)
+					}
 				}
 			}
 		}
